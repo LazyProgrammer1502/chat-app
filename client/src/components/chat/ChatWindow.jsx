@@ -9,10 +9,10 @@ import TypingIndicator from './TypingIndicator';
 import { dateDivider } from '../../utils/time';
 import toast from 'react-hot-toast';
 
-export default function ChatWindow({ room }) {
-  const { user }                                         = useAuth();
+export default function ChatWindow({ room, onBack }) {
+  const { user }                                          = useAuth();
   const { sendMessage, markRead, setHandlers, typingMap,
-          deleteMessage, onlineUsers }                   = useSocket();
+          deleteMessage, onlineUsers }                    = useSocket();
 
   const [messages,    setMessages]    = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -25,7 +25,6 @@ export default function ChatWindow({ room }) {
   const containerRef = useRef(null);
   const roomIdRef    = useRef(room._id);
 
-  // Keep roomId ref fresh
   useEffect(() => { roomIdRef.current = room._id; }, [room._id]);
 
   // ── Load messages when room changes ──────────────────────
@@ -56,7 +55,6 @@ export default function ChatWindow({ room }) {
       onMessage: ({ roomId, message }) => {
         if (roomId !== roomIdRef.current) return;
         setMessages(prev => {
-          // Avoid duplicates
           if (prev.find(m => m._id === message._id)) return prev;
           return [...prev, message];
         });
@@ -71,7 +69,6 @@ export default function ChatWindow({ room }) {
       },
       onRead: ({ roomId }) => {
         if (roomId !== roomIdRef.current) return;
-        // Mark all messages as read visually
         setMessages(prev => prev.map(m => ({ ...m, _read: true })));
       },
     });
@@ -91,10 +88,7 @@ export default function ChatWindow({ room }) {
       setMessages(prev => [...data.messages, ...prev]);
       setHasMore(data.hasMore);
       setPage(nextPage);
-      // Keep scroll position after prepending
-      requestAnimationFrame(() => {
-        el.scrollTop = el.scrollHeight - prevHeight;
-      });
+      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight - prevHeight; });
     } catch {
       toast.error('Failed to load older messages');
     } finally {
@@ -120,17 +114,10 @@ export default function ChatWindow({ room }) {
         fd.append('file', file);
         const uploadFn = fileType === 'image' ? messageService.uploadImage : messageService.uploadFile;
         const { data } = await uploadFn(fd);
-
         sendMessage({
-          roomId:   room._id,
-          type:     data.type,
-          fileUrl:  data.fileUrl,
-          fileName: data.fileName,
-          fileSize: data.fileSize,
-          text:     '',
-        }, (res) => {
-          if (!res?.success) toast.error('Failed to send file');
-        });
+          roomId: room._id, type: data.type,
+          fileUrl: data.fileUrl, fileName: data.fileName, fileSize: data.fileSize, text: '',
+        }, (res) => { if (!res?.success) toast.error('Failed to send file'); });
       } catch {
         toast.error('Failed to upload file');
       } finally {
@@ -140,9 +127,8 @@ export default function ChatWindow({ room }) {
     }
 
     if (!text?.trim()) return;
-    sendMessage({ roomId: room._id, type: 'text', text: text.trim() }, (res) => {
-      if (!res?.success) toast.error('Failed to send message');
-    });
+    sendMessage({ roomId: room._id, type: 'text', text: text.trim() },
+      (res) => { if (!res?.success) toast.error('Failed to send message'); });
   }, [sending, room._id, sendMessage]);
 
   // ── Delete message ────────────────────────────────────────
@@ -152,38 +138,29 @@ export default function ChatWindow({ room }) {
     });
   }, [room._id, deleteMessage]);
 
-  // ── Typing users for this room ────────────────────────────
   const typers = typingMap[room._id] || {};
   const typerNames = Object.values(typers).filter(Boolean);
 
-  // ── Get the other user for DMs (for online status) ───────
   const otherUser = room.type === 'dm'
     ? room.members?.find(m => (m._id || m).toString() !== user._id.toString())
     : null;
   const isOtherOnline = otherUser ? !!onlineUsers[otherUser._id || otherUser] : false;
 
-  // ── Render ────────────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
-      <ChatHeader room={room} otherUser={otherUser} isOnline={isOtherOnline} />
+    <div className="flex flex-col h-full overflow-hidden bg-white w-full">
+      <ChatHeader room={room} otherUser={otherUser} isOnline={isOtherOnline} onBack={onBack} />
 
       {/* Messages area */}
       <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
-
-        {/* Load more indicator */}
         {loadingMore && (
           <div className="text-center py-2">
             <div className="inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
-
         {hasMore && !loadingMore && (
-          <div className="text-center py-1">
-            <span className="text-xs text-gray-400">Scroll up for older messages</span>
-          </div>
+          <p className="text-center text-xs text-gray-400 py-1">Scroll up for older messages</p>
         )}
 
-        {/* Skeleton */}
         {loading ? (
           <MessagesSkeleton />
         ) : messages.length === 0 ? (
@@ -198,7 +175,7 @@ export default function ChatWindow({ room }) {
           <>
             {messages.map((msg, i) => {
               const prev = messages[i - 1];
-              const showDate = !prev || dateDivider(msg.createdAt) !== dateDivider(prev.createdAt);
+              const showDate   = !prev || dateDivider(msg.createdAt) !== dateDivider(prev.createdAt);
               const showAvatar = !prev || prev.sender?._id !== msg.sender?._id ||
                 new Date(msg.createdAt) - new Date(prev.createdAt) > 5 * 60 * 1000;
               const isLast = i === messages.length - 1;
@@ -225,9 +202,7 @@ export default function ChatWindow({ room }) {
           </>
         )}
 
-        {/* Typing indicator */}
         {typerNames.length > 0 && <TypingIndicator names={typerNames} />}
-
         <div ref={bottomRef} />
       </div>
 
@@ -238,7 +213,7 @@ export default function ChatWindow({ room }) {
 
 const MessagesSkeleton = () => (
   <div className="space-y-4 animate-pulse">
-    {[1, 2, 3, 4, 5].map((i) => (
+    {[1, 2, 3, 4, 5].map(i => (
       <div key={i} className={`flex gap-2 ${i % 2 === 0 ? 'flex-row-reverse' : ''}`}>
         <div className="w-8 h-8 rounded-full bg-gray-100 shrink-0" />
         <div className={`space-y-1 max-w-xs ${i % 2 === 0 ? 'items-end' : ''} flex flex-col`}>

@@ -33,6 +33,7 @@ export default function Sidebar({ onNewGroup }) {
 
   const handleSelectUser = (u) => {
     openDM(u._id);
+    onRoomSelect?.();
     setQuery('');
     setResults([]);
   };
@@ -151,7 +152,7 @@ export default function Sidebar({ onNewGroup }) {
               const unread   = unreadMap[room._id] || 0;
 
               return (
-                <button key={room._id} onClick={() => setActiveRoom(room)}
+                <button key={room._id} onClick={() => { setActiveRoom(room); onRoomSelect?.(); }}
                   className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
                     isActive ? 'bg-blue-50 border-r-2 border-blue-600' : 'hover:bg-gray-50'
                   }`}>

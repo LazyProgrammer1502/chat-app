@@ -6,48 +6,57 @@ import ChatWindow from '../components/chat/ChatWindow';
 import { useChat } from '../context/ChatContext';
 
 export default function ChatLayout() {
-  const { activeRoom, setActiveRoom } = useChat();
+  const { activeRoom } = useChat();
   const [showGroup,   setShowGroup]   = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [mobileView,  setMobileView]  = useState('sidebar'); // 'sidebar' | 'chat'
 
-  const handleRoomSelect = () => {
-    setShowSidebar(false); // on mobile, hide sidebar when chat opens
-  };
-
-  const handleBack = () => {
-    setShowSidebar(true);  // on mobile, go back to sidebar
-  };
+  const openChat = () => setMobileView('chat');
+  const openSidebar = () => setMobileView('sidebar');
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', position: 'relative' }}>
 
-      {/* Sidebar — full width on mobile when visible, fixed width on desktop */}
-      <div className={`
-        ${activeRoom && !showSidebar ? 'hidden' : 'flex'}
-        md:flex flex-col
-        w-full md:w-72
-        shrink-0
-      `}>
+      {/* ── Sidebar ─────────────────────────────────────────
+          Mobile: full screen, hidden when mobileView === 'chat'
+          Desktop: fixed 288px wide, always visible               */}
+      <div style={{
+        width: '100%',
+        maxWidth: '288px',
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        position: 'absolute',
+        left: 0, top: 0, bottom: 0,
+        zIndex: 10,
+        transform: mobileView === 'chat' ? 'translateX(-100%)' : 'translateX(0)',
+        transition: 'transform 0.25s ease',
+      }}
+      className="md:static md:transform-none md:translate-x-0 md:z-auto"
+      >
         <Sidebar
           onNewGroup={() => setShowGroup(true)}
-          onRoomSelect={handleRoomSelect}
+          onRoomSelect={openChat}
         />
       </div>
 
-      {/* Chat area — full width on mobile when visible, flex-1 on desktop */}
-      <div className={`
-        ${!activeRoom || showSidebar ? 'hidden' : 'flex'}
-        md:flex flex-col flex-1 min-w-0
-      `}>
+      {/* ── Chat area ────────────────────────────────────────
+          Mobile: full screen, shown when mobileView === 'chat'
+          Desktop: fills remaining space                         */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        marginLeft: 0,
+        overflow: 'hidden',
+      }}
+      className="md:ml-72"
+      >
         {activeRoom
-          ? <ChatWindow room={activeRoom} onBack={handleBack} />
+          ? <ChatWindow room={activeRoom} onBack={openSidebar} />
           : <EmptyChat />
         }
-      </div>
-
-      {/* Desktop only — empty state when no room selected */}
-      <div className="hidden md:flex flex-1 min-w-0">
-        {!activeRoom && <EmptyChat />}
       </div>
 
       {showGroup && <NewGroupModal onClose={() => setShowGroup(false)} />}

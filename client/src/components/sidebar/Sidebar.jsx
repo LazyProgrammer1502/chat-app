@@ -7,13 +7,13 @@ import Avatar from '../ui/Avatar';
 import { timeAgo } from '../../utils/time';
 import toast from 'react-hot-toast';
 
-export default function Sidebar({ onNewGroup }) {
-  const { user, logout }                         = useAuth();
+export default function Sidebar({ onNewGroup, onRoomSelect }) {
+  const { user, logout }                                     = useAuth();
   const { rooms, activeRoom, setActiveRoom, openDM, loadingRooms } = useChat();
-  const { connected, onlineUsers, unreadMap }    = useSocket();
+  const { connected, onlineUsers, unreadMap }                = useSocket();
 
-  const [query,   setQuery]   = useState('');
-  const [results, setResults] = useState([]);
+  const [query,     setQuery]     = useState('');
+  const [results,   setResults]   = useState([]);
   const [searching, setSearching] = useState(false);
   const debounce = useRef(null);
 
@@ -33,35 +33,45 @@ export default function Sidebar({ onNewGroup }) {
 
   const handleSelectUser = (u) => {
     openDM(u._id);
-    onRoomSelect?.();
     setQuery('');
     setResults([]);
+    onRoomSelect?.();
   };
 
-  // Derive display name + other user for DMs
+  const handleSelectRoom = (room) => {
+    setActiveRoom(room);
+    onRoomSelect?.();
+  };
+
   const roomMeta = (room) => {
-    if (room.type === 'group') return { name: room.name, user: null };
-    const other = room.members?.find(m => (m._id || m) !== user._id && m._id !== user._id);
-    return { name: other?.name || 'Unknown', user: other };
+    if (room.type === 'group') return { name: room.name, other: null };
+    const other = room.members?.find(m => {
+      const id = m._id ? m._id.toString() : m.toString();
+      return id !== user._id.toString();
+    });
+    return { name: other?.name || 'Unknown', other };
   };
 
   const lastMsgPreview = (room) => {
     const m = room.lastMessage;
     if (!m) return 'No messages yet';
-    if (m.isDeleted) return '🚫 Deleted';
+    if (m.isDeleted)     return '🚫 Deleted';
     if (m.type === 'image') return '📷 Image';
     if (m.type === 'file')  return '📎 File';
     return m.text || '';
   };
 
   return (
-    <aside className="w-72 bg-white border-r border-gray-100 flex flex-col h-full shrink-0">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'white', borderRight: '1px solid #f3f4f6' }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
         <div className="flex items-center gap-2">
           <span className="font-bold text-gray-900 text-lg">💬 Chats</span>
-          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'}`} title={connected ? 'Online' : 'Connecting…'} />
+          <span
+            className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'}`}
+            title={connected ? 'Connected' : 'Reconnecting…'}
+          />
         </div>
         <div className="flex gap-1">
           <button onClick={onNewGroup} title="New group"
@@ -80,7 +90,7 @@ export default function Sidebar({ onNewGroup }) {
       </div>
 
       {/* Current user */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 shrink-0">
         <Avatar user={user} size="sm" online={true} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
@@ -89,9 +99,10 @@ export default function Sidebar({ onNewGroup }) {
       </div>
 
       {/* Search */}
-      <div className="px-3 py-2 border-b border-gray-50">
+      <div className="px-3 py-2 border-b border-gray-50 shrink-0">
         <div className="relative">
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
           <input type="text" value={query} onChange={e => setQuery(e.target.value)}
@@ -99,13 +110,14 @@ export default function Sidebar({ onNewGroup }) {
             className="w-full bg-gray-50 border-0 rounded-xl pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           {query && (
             <button onClick={() => { setQuery(''); setResults([]); }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs hover:text-gray-600">✕</button>
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs hover:text-gray-600">
+              ✕
+            </button>
           )}
         </div>
 
-        {/* Search results */}
         {(searching || results.length > 0) && (
-          <div className="mt-1 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden z-10">
+          <div className="mt-1 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden">
             {searching
               ? <p className="px-4 py-3 text-sm text-gray-400 text-center">Searching…</p>
               : results.map(u => (
@@ -123,8 +135,8 @@ export default function Sidebar({ onNewGroup }) {
         )}
       </div>
 
-      {/* Rooms list */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Rooms list — scrollable */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
         {loadingRooms ? (
           <div className="space-y-0 animate-pulse py-2">
             {[1,2,3,4].map(i => (
@@ -146,16 +158,18 @@ export default function Sidebar({ onNewGroup }) {
         ) : (
           <div className="py-1">
             {rooms.map(room => {
-              const { name, user: other } = roomMeta(room);
+              const { name, other } = roomMeta(room);
               const isActive = activeRoom?._id === room._id;
               const isOnline = other ? !!onlineUsers[other._id] : false;
               const unread   = unreadMap[room._id] || 0;
 
               return (
-                <button key={room._id} onClick={() => { setActiveRoom(room); onRoomSelect?.(); }}
+                <button key={room._id}
+                  onClick={() => handleSelectRoom(room)}
                   className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
                     isActive ? 'bg-blue-50 border-r-2 border-blue-600' : 'hover:bg-gray-50'
-                  }`}>
+                  }`}
+                >
                   {room.type === 'group'
                     ? <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
                         {name[0]?.toUpperCase()}
@@ -186,6 +200,6 @@ export default function Sidebar({ onNewGroup }) {
           </div>
         )}
       </div>
-    </aside>
+    </div>
   );
 }
